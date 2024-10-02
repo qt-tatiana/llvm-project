@@ -75,9 +75,6 @@ void IntegerSignComparison::registerPPCallbacks(const SourceManager &SM,
 
 void IntegerSignComparison::check(const MatchFinder::MatchResult &Result)
 {
-  if (!getLangOpts().CPlusPlus20)
-    return;
-
   const auto *SignedCastExpression =
       Result.Nodes.getNodeAs<ImplicitCastExpr>("sIntCastExpression");
   const auto *UnSignedCastExpression =
@@ -106,22 +103,22 @@ void IntegerSignComparison::check(const MatchFinder::MatchResult &Result)
     switch (opCode)
     {
     case BO_LT:
-      cmpType = "std::cmp_less(";
+      cmpType = "q20::cmp_less(";
       break;
     case BO_GT:
-      cmpType = "std::cmp_greater(";
+      cmpType = "q20::cmp_greater(";
       break;
     case BO_LE:
-      cmpType = "std::cmp_less_equal(";
+      cmpType = "q20::cmp_less_equal(";
       break;
     case BO_GE:
-      cmpType = "std::cmp_greater_equal(";
+      cmpType = "q20::cmp_greater_equal(";
       break;
     case BO_EQ:
-      cmpType = "std::cmp_equal(";
+      cmpType = "q20::cmp_equal(";
       break;
     case BO_NE:
-      cmpType = "std::cmp_not_equal(";
+      cmpType = "q20::cmp_not_equal(";
       break;
     default: return;
     }
@@ -142,16 +139,18 @@ void IntegerSignComparison::check(const MatchFinder::MatchResult &Result)
         *Result.SourceManager, getLangOpts()));
 
     auto Diag = diag(binaryOp->getBeginLoc(),
-                     "comparison between 'signed' and 'unsigned' integers")
-                << FixItHint::CreateReplacement(
-                       CharSourceRange::getTokenRange(binaryOp->getBeginLoc(), binaryOp->getEndLoc()),
-                       StringRef(std::string(cmpType) + std::string(LHSString)
-                                 + std::string(", ") + std::string(RHSString) + std::string(")")));
+                     "comparison between 'signed' and 'unsigned' integers");
+    if (getLangOpts().CPlusPlus20 || getLangOpts().CPlusPlus17) {
+      Diag << FixItHint::CreateReplacement(
+          CharSourceRange::getTokenRange(binaryOp->getBeginLoc(), binaryOp->getEndLoc()),
+          StringRef(std::string(cmpType) + std::string(LHSString)
+                    + std::string(", ") + std::string(RHSString) + std::string(")")));
 
-    // in case of there is no include for std::cmp_{*} functions, we'll add it.
-    Diag << IncludeInserter.createIncludeInsertion(
-        Result.SourceManager->getFileID(binaryOp->getBeginLoc()),
-        "<utility>");
+      // If there is no include for q20::cmp_{*} functions, we'll add it.
+      Diag << IncludeInserter.createIncludeInsertion(
+          Result.SourceManager->getFileID(binaryOp->getBeginLoc()),
+          "<QtCore/q20utility.h>");
+    }
   }
 }
 

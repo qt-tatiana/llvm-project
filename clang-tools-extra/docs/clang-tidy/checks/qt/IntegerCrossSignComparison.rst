@@ -22,11 +22,11 @@ becomes
 
 .. code-block:: c++
 
-uint func(int bla)
-{
-    uint result;
-    if (std::cmp_equal(result, bla))
-        return 0;
+    uint func(int bla)
+    {
+        uint result;
+        if (std::cmp_equal(result, bla))
+            return 0;
 
-    return 1;
-}
+        return 1;
+    }
