@@ -16,6 +16,13 @@ using namespace clang::ast_matchers::internal;
 
 namespace clang::tidy::qt {
 
+IntegerSignComparison::IntegerSignComparison(StringRef Name, ClangTidyContext *Context)
+    : ClangTidyCheck(Name, Context),
+      IncludeInserter(Options.getLocalOrGlobal("IncludeStyle",
+                                               utils::IncludeSorter::IS_LLVM),
+                      areDiagsSelfContained())
+{}
+
 void IntegerSignComparison::registerMatchers(MatchFinder *Finder)
 {
   const auto SignedIntCastExpr =
@@ -30,7 +37,7 @@ void IntegerSignComparison::registerMatchers(MatchFinder *Finder)
                                       hasRHS(UnSignedIntCastExpr)),
                                 allOf(hasLHS(UnSignedIntCastExpr),
                                       hasRHS(SignedIntCastExpr)))))
-          .bind("IntComparison");
+          .bind("intComparison");
 
   Finder->addMatcher(CompareOperator, this);
 }
@@ -59,6 +66,13 @@ BindableMatcher<clang::Stmt> IntegerSignComparison::intCastExpression(
                                       StaticCastExpr, FunctionalCastExpr)));
 }
 
+void IntegerSignComparison::registerPPCallbacks(const SourceManager &SM,
+                                                Preprocessor *PP,
+                                                Preprocessor *ModuleExpanderPP)
+{
+  IncludeInserter.registerPreprocessor(PP);
+}
+
 void IntegerSignComparison::check(const MatchFinder::MatchResult &Result)
 {
   if (!getLangOpts().CPlusPlus20)
@@ -71,7 +85,7 @@ void IntegerSignComparison::check(const MatchFinder::MatchResult &Result)
   assert(SignedCastExpression);
   assert(UnSignedCastExpression);
 
-         // Ignore the match if we know that the signed int value is not negative.
+  // Ignore the match if we know that the signed int value is not negative.
   Expr::EvalResult EVResult;
   if (!SignedCastExpression->isValueDependent() &&
       SignedCastExpression->getSubExpr()->EvaluateAsInt(EVResult,
@@ -82,7 +96,7 @@ void IntegerSignComparison::check(const MatchFinder::MatchResult &Result)
     }
   }
 
-  const auto *binaryOp = Result.Nodes.getNodeAs<BinaryOperator>("IntComparison");
+  const auto *binaryOp = Result.Nodes.getNodeAs<BinaryOperator>("intComparison");
   if (binaryOp == nullptr) {
     diag(" Nothing interesting ");
     return;
@@ -127,12 +141,17 @@ void IntegerSignComparison::check(const MatchFinder::MatchResult &Result)
         CharSourceRange::getTokenRange(RHS->getSourceRange()),
         *Result.SourceManager, getLangOpts()));
 
-    diag(binaryOp->getBeginLoc(),
-         "comparison between 'signed' and 'unsigned' integers")
-        << FixItHint::CreateReplacement(
-               CharSourceRange::getTokenRange(binaryOp->getBeginLoc(), binaryOp->getEndLoc()),
-               StringRef(std::string(cmpType) + std::string(LHSString)
-                         + std::string(", ") + std::string(RHSString) + std::string(")")));
+    auto Diag = diag(binaryOp->getBeginLoc(),
+                     "comparison between 'signed' and 'unsigned' integers")
+                << FixItHint::CreateReplacement(
+                       CharSourceRange::getTokenRange(binaryOp->getBeginLoc(), binaryOp->getEndLoc()),
+                       StringRef(std::string(cmpType) + std::string(LHSString)
+                                 + std::string(", ") + std::string(RHSString) + std::string(")")));
+
+    // in case of there is no include for std::cmp_{*} functions, we'll add it.
+    Diag << IncludeInserter.createIncludeInsertion(
+        Result.SourceManager->getFileID(binaryOp->getBeginLoc()),
+        "<utility>");
   }
 }
 

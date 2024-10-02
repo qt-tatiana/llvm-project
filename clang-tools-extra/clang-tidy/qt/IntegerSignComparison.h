@@ -10,6 +10,7 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_QT_INTEGERSIGNCOMPARISON_H
 
 #include "../ClangTidyCheck.h"
+#include "../utils/IncludeInserter.h"
 
 namespace clang::tidy::qt {
 
@@ -19,14 +20,17 @@ namespace clang::tidy::qt {
 /// http://clang.llvm.org/extra/clang-tidy/checks/qt/IntegerSignComparison.html
 class IntegerSignComparison : public ClangTidyCheck {
 public:
-  IntegerSignComparison(StringRef Name, ClangTidyContext *Context)
-      : ClangTidyCheck(Name, Context) {}
+  IntegerSignComparison(StringRef Name, ClangTidyContext *Context);
+  void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,
+                           Preprocessor *ModuleExpanderPP) override;
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
 private:
   ast_matchers::internal::BindableMatcher<clang::Stmt> intCastExpression(
       bool IsSigned, const std::string &CastBindName) const;
+
+  utils::IncludeInserter IncludeInserter;
 };
 
 } // namespace clang::tidy::qt
