@@ -109,6 +109,15 @@ New checks
   Gives warnings for tagged unions, where the number of tags is
   different from the number of data members inside the union.
 
+
+- New :doc:`qt-integer-sign-comparison
+  <clang-tidy/checks/qt/integer-sign-comparison>` check.
+
+  Detects comparison between signed and unsigned integer values
+  and suggests a fix-it. The fix-it replaces direct comparisons of
+  signed and unsigned integers to
+  std::cmp_{equal,not_equal,{less,greater}{,_equal}} functions.
+
 New check aliases
 ^^^^^^^^^^^^^^^^^
 
